@@ -197,9 +197,11 @@
   .date-presets button.active{background:var(--green);border-color:var(--green);color:#fff;}
   .chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;}
   .chart-card h3{margin:0 0 8px;font-size:14px;}
-  .chart-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-  .chart-filters label{display:flex;align-items:center;gap:5px;font-size:12px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);cursor:pointer;user-select:none;}
-  .chart-filters input{margin:0;}
+  .chart-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .chart-filters label{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:20px;border:1.5px solid var(--border);cursor:pointer;user-select:none;background:var(--card);transition:opacity .15s;}
+  .chart-filters label:has(input:not(:checked)){opacity:.4;}
+  .chart-filters input{margin:0;accent-color:currentColor;}
+  .chart-filters .dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 0 2px rgba(0,0,0,.06);}
   .chart-wrap{position:relative;height:230px;}
   .top-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
   @media (max-width:520px){ .top-cols{grid-template-columns:1fr;} }
@@ -1814,17 +1816,21 @@ function loadDashboard(){
    overall hourly sales pattern rather than a flat per-day timeline. */
 let hourlyChart = null;
 const hourlyHiddenSeries = new Set();
+// Colors picked for maximum hue separation (rose / teal / amber / indigo) rather than staying
+// inside the brown palette — on a data chart, distinguishability beats brand-color purity.
+// Each series also gets its own point shape and, for the two sharing the บาท axis, a dash
+// pattern, so lines stay tellable apart even for someone with red-green color blindness.
 const HOURLY_SERIES = [
-  { key:'revenue', label:'ยอดขาย (บาท)', color:'#F0567C', axis:'yBaht' },
-  { key:'qty', label:'จำนวนชิ้น', color:'#7A4A26', axis:'yCount' },
-  { key:'orders', label:'จำนวน Order', color:'#B08862', axis:'yCount' },
-  { key:'avgPerBill', label:'บาท/บิล', color:'#D6416A', axis:'yBaht' }
+  { key:'revenue', label:'ยอดขาย (บาท)', color:'#D6336C', axis:'yBaht', pointStyle:'circle', dash:[] },
+  { key:'qty', label:'จำนวนชิ้น', color:'#0E9F6E', axis:'yCount', pointStyle:'rectRot', dash:[] },
+  { key:'orders', label:'จำนวน Order', color:'#2B6CB0', axis:'yCount', pointStyle:'triangle', dash:[] },
+  { key:'avgPerBill', label:'บาท/บิล', color:'#DD8B0A', axis:'yBaht', pointStyle:'rect', dash:[6,4] }
 ];
 function renderHourlyChart(sales){
   const filterBox = document.getElementById('hourlyChartFilters');
   if(filterBox && !filterBox.dataset.built){
     filterBox.innerHTML = HOURLY_SERIES.map(s=>`
-      <label><input type="checkbox" checked onchange="toggleHourlySeries('${s.key}', this.checked)"><span style="color:${s.color};">●</span> ${s.label}</label>
+      <label style="border-color:${s.color};"><input type="checkbox" checked onchange="toggleHourlySeries('${s.key}', this.checked)"><span class="dot" style="background:${s.color};"></span> ${s.label}</label>
     `).join('');
     filterBox.dataset.built = '1';
   }
@@ -1856,9 +1862,16 @@ function renderHourlyChart(sales){
     borderColor: s.color,
     backgroundColor: s.color,
     yAxisID: s.axis,
-    tension: .3,
-    pointRadius: 2,
-    borderWidth: 2,
+    tension: .25,
+    fill: false,
+    borderDash: s.dash,
+    pointStyle: s.pointStyle,
+    pointRadius: 3,
+    pointHoverRadius: 6,
+    pointBackgroundColor: s.color,
+    pointBorderColor: '#fff',
+    pointBorderWidth: 1,
+    borderWidth: 2.5,
     hidden: hourlyHiddenSeries.has(s.key)
   }));
   hourlyChart = new Chart(ctx, {
@@ -1867,10 +1880,36 @@ function renderHourlyChart(sales){
     options:{
       responsive:true, maintainAspectRatio:false,
       interaction:{ mode:'index', intersect:false },
-      plugins:{ legend:{ display:false } },
+      plugins:{
+        legend:{ display:false },
+        tooltip:{
+          backgroundColor:'#fff', titleColor:'#2B2016', bodyColor:'#2B2016',
+          borderColor:'#EDE1D3', borderWidth:1, padding:10,
+          titleFont:{ weight:'700' },
+          usePointStyle:true,
+          callbacks:{
+            label: function(item){
+              const s = HOURLY_SERIES[item.datasetIndex];
+              const v = item.parsed.y;
+              return ' ' + s.label + ': ' + (s.axis==='yBaht' ? '฿'+v.toLocaleString('th-TH') : v.toLocaleString('th-TH'));
+            }
+          }
+        }
+      },
       scales:{
-        yBaht:{ type:'linear', position:'left', beginAtZero:true, title:{display:true,text:'บาท'}, grid:{ color:'#EDE1D3' } },
-        yCount:{ type:'linear', position:'right', beginAtZero:true, title:{display:true,text:'ชิ้น / บิล'}, grid:{ drawOnChartArea:false } }
+        x:{ grid:{ color:'#F3E9DC' }, ticks:{ color:'#8B7A6B', font:{ size:11 } } },
+        yBaht:{
+          type:'linear', position:'left', beginAtZero:true,
+          title:{ display:true, text:'บาท', color:'#8B7A6B', font:{ size:11, weight:'700' } },
+          grid:{ color:'#F3E9DC' },
+          ticks:{ color:'#8B7A6B', callback:(v)=>'฿'+v.toLocaleString('th-TH') }
+        },
+        yCount:{
+          type:'linear', position:'right', beginAtZero:true,
+          title:{ display:true, text:'ชิ้น / บิล', color:'#8B7A6B', font:{ size:11, weight:'700' } },
+          grid:{ drawOnChartArea:false },
+          ticks:{ color:'#8B7A6B' }
+        }
       }
     }
   });
