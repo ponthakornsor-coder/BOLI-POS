@@ -6,6 +6,7 @@
 <title>BOLI POS</title>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/JsBarcode/3.11.5/JsBarcode.all.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <style>
   :root{
     /* BOLI brand palette — 90% warm brown (surfaces, primary actions), 7% white/cream
@@ -187,8 +188,22 @@
   .top-list .prod-row{margin-bottom:6px;}
   .bar-wrap{background:#eceeed;border-radius:6px;height:8px;margin-top:4px;overflow:hidden;}
   .bar-fill{height:100%;background:var(--green);}
-  .date-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
+  .bar-fill.worst{background:var(--pink);}
+  .date-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
   .date-row input{padding:9px;border-radius:8px;border:1px solid var(--border);}
+  .date-row .sep{color:var(--muted);font-size:12px;}
+  .date-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+  .date-presets button{padding:6px 12px;font-size:12px;border-radius:20px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;}
+  .date-presets button.active{background:var(--green);border-color:var(--green);color:#fff;}
+  .chart-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:12px;}
+  .chart-card h3{margin:0 0 8px;font-size:14px;}
+  .chart-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .chart-filters label{display:flex;align-items:center;gap:5px;font-size:12px;padding:5px 10px;border-radius:20px;border:1px solid var(--border);cursor:pointer;user-select:none;}
+  .chart-filters input{margin:0;}
+  .chart-wrap{position:relative;height:230px;}
+  .top-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media (max-width:520px){ .top-cols{grid-template-columns:1fr;} }
+  .top-cols h4{font-size:13px;margin:0 0 6px;}
 
   /* settings */
   textarea{width:100%;min-height:70px;padding:10px;border-radius:8px;border:1px solid var(--border);font-family:monospace;font-size:12px;}
@@ -316,9 +331,15 @@
     <!-- DASHBOARD VIEW -->
     <section class="view" id="view-dash">
       <div class="date-row">
-        <label style="font-size:13px;">วันที่</label>
-        <input type="date" id="dashDate" onchange="loadDashboard()">
-        <button class="btn btn-outline" style="padding:8px 12px;font-size:12px;" onclick="setToday()">วันนี้</button>
+        <label style="font-size:13px;">ตั้งแต่</label>
+        <input type="date" id="dashDate" onchange="onDashDateChange()">
+        <span class="sep">ถึง</span>
+        <input type="date" id="dashDateTo" onchange="onDashDateChange()">
+      </div>
+      <div class="date-presets" id="datePresets">
+        <button type="button" data-preset="today" onclick="applyDatePreset('today')">วันนี้</button>
+        <button type="button" data-preset="7" onclick="applyDatePreset('7')">7 วันล่าสุด</button>
+        <button type="button" data-preset="30" onclick="applyDatePreset('30')">30 วันล่าสุด</button>
       </div>
       <div class="field" style="margin-bottom:12px;">
         <label>ดูข้อมูลของ</label>
@@ -332,8 +353,25 @@
         <div class="stat-card"><div class="lbl">สินค้าขายดี</div><div class="val" id="dashTopQty">-</div></div>
       </div>
       <div id="lowStockSection"></div>
-      <div class="top-list" id="dashTopList"></div>
-      <h3>📸 รูปบิลที่ส่งวันนี้</h3>
+
+      <div class="chart-card">
+        <h3>📈 แนวโน้มยอดขายรายชั่วโมง</h3>
+        <div class="chart-filters" id="hourlyChartFilters"></div>
+        <div class="chart-wrap"><canvas id="hourlyChart"></canvas></div>
+      </div>
+
+      <div class="top-cols">
+        <div>
+          <h4>🔥 ขายดี Top 5</h4>
+          <div class="top-list" id="dashTopList"></div>
+        </div>
+        <div>
+          <h4>🥶 ขายน้อย Top 5</h4>
+          <div class="top-list" id="dashWorstList"></div>
+        </div>
+      </div>
+
+      <h3>📸 รูปบิลที่ส่ง</h3>
       <div id="dashReceiptPhotos"></div>
     </section>
 
@@ -1652,9 +1690,25 @@ function submitStockCountAll(){
 }
 
 /* ---------------- Dashboard ---------------- */
-function setToday(){
-  const d = new Date();
-  document.getElementById('dashDate').value = d.toISOString().slice(0,10);
+function ymd(d){ return d.toISOString().slice(0,10); }
+function setToday(){ applyDatePreset('today'); }
+function applyDatePreset(preset){
+  const today = new Date();
+  let startStr, endStr;
+  if(preset==='today'){
+    startStr = ymd(today); endStr = '';
+  } else {
+    const days = Number(preset);
+    const start = new Date(today); start.setDate(start.getDate()-(days-1));
+    startStr = ymd(start); endStr = ymd(today);
+  }
+  document.getElementById('dashDate').value = startStr;
+  document.getElementById('dashDateTo').value = endStr;
+  document.querySelectorAll('#datePresets button').forEach(b=>b.classList.toggle('active', b.dataset.preset===preset));
+  loadDashboard();
+}
+function onDashDateChange(){
+  document.querySelectorAll('#datePresets button').forEach(b=>b.classList.remove('active'));
   loadDashboard();
 }
 function renderDashBranchFilterOptions(){
@@ -1709,7 +1763,11 @@ function loadDashboard(){
   if(!requireBackend()) return;
   const dateStr = document.getElementById('dashDate').value;
   if(!dateStr) return;
-  apiGet('sales', {date: dateStr}).then(sales=>{
+  const dateToStr = document.getElementById('dashDateTo').value || dateStr;
+  // startDate/endDate range query — a single day is just a range where both ends match.
+  const startDate = dateStr <= dateToStr ? dateStr : dateToStr;
+  const endDate = dateStr <= dateToStr ? dateToStr : dateStr;
+  apiGet('sales', {startDate, endDate}).then(sales=>{
     if(sales && sales.error) throw new Error(sales.error);
     sales = sales || [];
     sales.forEach(s=>{ try{ s.items = JSON.parse(s.items); }catch(e){ s.items = []; } });
@@ -1725,21 +1783,103 @@ function loadDashboard(){
     document.getElementById('dashAvg').textContent = baht(avg);
     const tally = {};
     filtered.forEach(s=> (s.items||[]).forEach(i=>{ tally[i.name] = (tally[i.name]||0)+Number(i.qty||0); }));
-    const top = Object.entries(tally).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const entries = Object.entries(tally);
+    const top = [...entries].sort((a,b)=>b[1]-a[1]).slice(0,5);
+    const worst = [...entries].sort((a,b)=>a[1]-b[1]).slice(0,5);
     document.getElementById('dashTopQty').textContent = top.length? top[0][0] : '-';
     const maxQty = top.length? top[0][1] : 1;
     document.getElementById('dashTopList').innerHTML = top.map(([name,qty])=>`
       <div class="prod-row" style="display:block;">
         <div class="info"><b>${escapeHtml(name)}</b><div>ขายได้ ${qty} ชิ้น</div>
         <div class="bar-wrap"><div class="bar-fill" style="width:${(qty/maxQty*100)}%;"></div></div></div>
-      </div>`).join('') || '<div class="empty-cart">ยังไม่มีข้อมูลการขายวันนี้</div>';
+      </div>`).join('') || '<div class="empty-cart">ยังไม่มีข้อมูลการขาย</div>';
+    document.getElementById('dashWorstList').innerHTML = worst.map(([name,qty])=>`
+      <div class="prod-row" style="display:block;">
+        <div class="info"><b>${escapeHtml(name)}</b><div>ขายได้ ${qty} ชิ้น</div>
+        <div class="bar-wrap"><div class="bar-fill worst" style="width:${Math.max(qty/maxQty*100,3)}%;"></div></div></div>
+      </div>`).join('') || '<div class="empty-cart">ยังไม่มีข้อมูลการขาย</div>';
+    renderHourlyChart(filtered);
   }).catch(e=>toast('โหลดรายงานไม่สำเร็จ: '+e.message));
-  apiGet('receiptPhotos', {date: dateStr}).then(photos=>{
+  apiGet('receiptPhotos', {startDate, endDate}).then(photos=>{
     if(photos && photos.error) throw new Error(photos.error);
     photos = photos || [];
     const filtered = dashBranchFilter ? photos.filter(p=>(p.branch||'')===dashBranchFilter) : photos;
     renderDashReceiptPhotos(filtered);
   }).catch(()=>renderDashReceiptPhotos([]));
+}
+
+/* Hourly trend chart: revenue / qty sold / order count / avg baht-per-bill, combined into one
+   chart with a filter row so staff can show only the series they care about. Sales across the
+   selected date range are bucketed by hour-of-day (0-23), so a multi-day range shows the
+   overall hourly sales pattern rather than a flat per-day timeline. */
+let hourlyChart = null;
+const hourlyHiddenSeries = new Set();
+const HOURLY_SERIES = [
+  { key:'revenue', label:'ยอดขาย (บาท)', color:'#F0567C', axis:'yBaht' },
+  { key:'qty', label:'จำนวนชิ้น', color:'#7A4A26', axis:'yCount' },
+  { key:'orders', label:'จำนวน Order', color:'#B08862', axis:'yCount' },
+  { key:'avgPerBill', label:'บาท/บิล', color:'#D6416A', axis:'yBaht' }
+];
+function renderHourlyChart(sales){
+  const filterBox = document.getElementById('hourlyChartFilters');
+  if(filterBox && !filterBox.dataset.built){
+    filterBox.innerHTML = HOURLY_SERIES.map(s=>`
+      <label><input type="checkbox" checked onchange="toggleHourlySeries('${s.key}', this.checked)"><span style="color:${s.color};">●</span> ${s.label}</label>
+    `).join('');
+    filterBox.dataset.built = '1';
+  }
+  if(typeof Chart === 'undefined') return;
+  const hours = Array.from({length:24}, (_,h)=>h);
+  const revenueByHour = hours.map(()=>0);
+  const qtyByHour = hours.map(()=>0);
+  const ordersByHour = hours.map(()=>0);
+  sales.forEach(s=>{
+    const t = s.timestamp ? new Date(s.timestamp) : null;
+    if(!t || isNaN(t.getTime())) return;
+    const h = t.getHours();
+    revenueByHour[h] += Number(s.total)||0;
+    ordersByHour[h] += 1;
+    (s.items||[]).forEach(i=>{ qtyByHour[h] += Number(i.qty||0); });
+  });
+  const avgByHour = hours.map(h => ordersByHour[h] ? revenueByHour[h]/ordersByHour[h] : 0);
+  const dataByKey = { revenue:revenueByHour, qty:qtyByHour, orders:ordersByHour, avgPerBill:avgByHour.map(v=>Math.round(v)) };
+  const ctx = document.getElementById('hourlyChart');
+  if(!ctx) return;
+  if(hourlyChart){
+    HOURLY_SERIES.forEach((s,i)=>{ hourlyChart.data.datasets[i].data = dataByKey[s.key]; });
+    hourlyChart.update();
+    return;
+  }
+  const datasets = HOURLY_SERIES.map(s=>({
+    label: s.label,
+    data: dataByKey[s.key],
+    borderColor: s.color,
+    backgroundColor: s.color,
+    yAxisID: s.axis,
+    tension: .3,
+    pointRadius: 2,
+    borderWidth: 2,
+    hidden: hourlyHiddenSeries.has(s.key)
+  }));
+  hourlyChart = new Chart(ctx, {
+    type:'line',
+    data:{ labels: hours.map(h=>String(h).padStart(2,'0')+':00'), datasets },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      interaction:{ mode:'index', intersect:false },
+      plugins:{ legend:{ display:false } },
+      scales:{
+        yBaht:{ type:'linear', position:'left', beginAtZero:true, title:{display:true,text:'บาท'}, grid:{ color:'#EDE1D3' } },
+        yCount:{ type:'linear', position:'right', beginAtZero:true, title:{display:true,text:'ชิ้น / บิล'}, grid:{ drawOnChartArea:false } }
+      }
+    }
+  });
+}
+function toggleHourlySeries(key, checked){
+  if(checked) hourlyHiddenSeries.delete(key); else hourlyHiddenSeries.add(key);
+  if(!hourlyChart) return;
+  const idx = HOURLY_SERIES.findIndex(s=>s.key===key);
+  if(idx>-1){ hourlyChart.setDatasetVisibility(idx, checked); hourlyChart.update(); }
 }
 function renderDashReceiptPhotos(photos){
   const box = document.getElementById('dashReceiptPhotos');
