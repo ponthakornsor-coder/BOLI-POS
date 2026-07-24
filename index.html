@@ -56,7 +56,10 @@
     #barcodePrintArea, #barcodePrintArea *{visibility:visible;}
     #barcodePrintArea{display:block;position:absolute;left:0;top:0;width:100%;}
   }
-  .cart{background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);}
+  .mini-cart-bar{position:sticky;top:0;z-index:6;display:flex;align-items:center;justify-content:space-between;gap:8px;background:linear-gradient(135deg,var(--green),var(--green-dark));color:#fff;padding:10px 14px;border-radius:12px;margin-bottom:10px;font-size:13px;font-weight:700;box-shadow:0 3px 10px rgba(0,60,25,.22);cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .mini-cart-bar:active{transform:scale(.98);}
+  .mini-cart-bar .mcb-arrow{opacity:.85;font-weight:600;font-size:12px;white-space:nowrap;}
+  .cart{background:var(--card);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);box-shadow:var(--shadow-sm);scroll-margin-top:64px;}
   .cart-item{display:flex;align-items:center;padding:12px 14px;border-bottom:1px solid var(--border);gap:10px;}
   .cart-item:last-child{border-bottom:none;}
   .cart-item .name{flex:1;min-width:0;}
@@ -203,6 +206,11 @@
   <main>
     <!-- POS VIEW -->
     <section class="view active" id="view-pos">
+      <div class="mini-cart-bar" id="miniCartBar" style="display:none;" onclick="scrollToCart()">
+        <span>🛒 <b id="miniCartCount">0</b> รายการ</span>
+        <span id="miniCartTotal">฿0.00</span>
+        <span class="mcb-arrow">ดูตะกร้า ▾</span>
+      </div>
       <div class="scan-row">
         <input id="barcodeInput" placeholder="สแกนหรือพิมพ์บาร์โค้ด แล้วกด Enter" autocomplete="off">
         <button class="btn btn-green" onclick="openScanner()">📷</button>
@@ -1111,12 +1119,14 @@ function addToCartByBarcode(code){
   const p = findProductByBarcode(code);
   if(!p){ toast('ไม่พบสินค้าบาร์โค้ด: '+code); return; }
   const stockNum = stockNumForBranchOps(p);
-  if(stockNum <= 0){ toast('⚠️ สต็อกไม่พอ (คงเหลือ '+stockNum+') แต่ยังขายต่อได้'); }
+  const lowStockNote = stockNum <= 0 ? ' — ⚠️ สต็อกไม่พอ แต่ยังขายต่อได้' : '';
   const existing = cart.find(c=>c.barcode===code);
   if(existing){
     existing.qty += 1;
+    toast('+1 ' + p.name + ' (รวม ' + existing.qty + ')' + lowStockNote);
   } else {
     cart.push({barcode:p.barcode, name:p.name, price:p.price, qty:1, maxStock:stockNum});
+    toast('+1 ' + p.name + lowStockNote);
   }
   renderCart();
 }
@@ -1316,6 +1326,19 @@ function renderCart(){
   const hasItems = cart.length>0;
   document.getElementById('payCashBtn').disabled = !hasItems;
   document.getElementById('payOtherBtn').disabled = !hasItems;
+  // Sticky mini-cart bar: lets the cashier see item count + running total while still
+  // scrolled through the product grid, without needing to scroll all the way down.
+  const miniBar = document.getElementById('miniCartBar');
+  if(miniBar){
+    miniBar.style.display = hasItems ? 'flex' : 'none';
+    const itemCount = cart.reduce((s,c)=>s+Number(c.qty||0),0);
+    document.getElementById('miniCartCount').textContent = itemCount;
+    document.getElementById('miniCartTotal').textContent = baht(total);
+  }
+}
+function scrollToCart(){
+  const el = document.getElementById('cartBox');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
 }
 function changeQty(i,delta){
   const item = cart[i];
