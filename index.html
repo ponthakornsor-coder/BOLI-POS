@@ -582,7 +582,7 @@ let backofficePin = '';   // '' = no lock configured
 let backofficeUnlocked = false; // session-only unlock state
 let pendingTabAfterPin = null;
 let pendingActionAfterPin = null; // arbitrary function to run after successful PIN entry (used for stock-count gate)
-const LOCKED_TABS = ['inventory','dash','settings']; // 'stock' tab itself is open to front-house; only "เช็ค Stock ปิดวัน" mode inside it is gated (see switchStockMode)
+const LOCKED_TABS = ['dash','settings']; // everything else is open to front-house; only Dashboard and Settings require the back-office PIN. 'stock' tab's "เช็ค Stock ปิดวัน" mode is still gated separately (see switchStockMode)
 let branches = []; // [{id, name}] — loaded from the Branches sheet via fetchBranches(); manage from Settings tab, no code editing needed
 // Dashboard branch filter is independent from currentBranch (which is just this device's POS/menu scope) —
 // staff can pick ANY branch to view here, even one this booth doesn't sell. '' = every branch combined.
