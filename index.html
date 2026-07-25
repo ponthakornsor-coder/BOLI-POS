@@ -190,7 +190,8 @@
   .stat-card:nth-child(1){border-left-color:var(--pink);}
   .stat-card:nth-child(3){border-left-color:var(--brown-light);}
   .stat-card:nth-child(4){border-left-color:var(--green-dark);}
-  .stat-card .lbl{font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;}
+  .stat-ic{position:absolute;top:10px;right:12px;font-size:15px;opacity:.5;}
+  .stat-card .lbl{font-size:10.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding-right:16px;}
   .stat-card .val{font-size:21px;font-weight:800;color:var(--text);margin-top:4px;letter-spacing:-.2px;}
   main .view h3{font-size:14px;font-weight:800;margin:16px 0 8px;letter-spacing:.1px;}
   main .view h3:first-child, .chart-card h3{margin-top:0;}
@@ -198,19 +199,21 @@
   .bar-wrap{background:#EFEAE3;border-radius:6px;height:7px;margin-top:5px;overflow:hidden;}
   .bar-fill{height:100%;background:var(--green);border-radius:6px;}
   .bar-fill.worst{background:var(--pink);}
-  .rank-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);}
+  .rank-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border-bottom:1px solid var(--border);border-radius:8px;transition:background .12s;}
   .rank-row:last-child{border-bottom:none;}
-  .rank-badge{flex:none;width:22px;height:22px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--muted);}
-  .rank-row:nth-child(1) .rank-badge{background:var(--green);border-color:var(--green);color:#fff;}
-  .rank-row:nth-child(2) .rank-badge{background:var(--brown-light);border-color:var(--brown-light);color:#fff;}
-  .rank-row:nth-child(3) .rank-badge{background:var(--pink-soft);border-color:var(--pink);color:var(--pink-dark);}
+  .rank-row.champion{background:linear-gradient(90deg,#FFF7E0,rgba(255,247,224,0));border-bottom-color:#F3E2A9;}
+  .rank-badge{flex:none;width:26px;height:26px;border-radius:50%;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--muted);box-shadow:var(--shadow-sm);}
+  .rank-badge.medal{font-size:16px;background:none;border:none;box-shadow:none;}
   .rank-row .rr-body{flex:1;min-width:0;}
   .rank-row .rr-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
   .rank-row .rr-name{font-size:13.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rank-row.champion .rr-name{color:#8A6200;}
   .rank-row .rr-nums{flex:none;text-align:right;font-size:12px;}
   .rank-row .rr-nums b{color:var(--green-dark);font-size:13px;}
   .rank-row .rr-nums span{color:var(--muted);}
   .rank-row .rr-sub{font-size:11.5px;color:var(--muted);margin-top:1px;}
+  .rank-row .bar-wrap{background:#EFEAE3;}
+  .rank-row.champion .bar-fill{background:linear-gradient(90deg,#E0A82E,#F3C969);}
   .date-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;}
   .date-row input{padding:9px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:13px;}
   .date-row .sep{color:var(--muted);font-size:12px;}
@@ -371,10 +374,10 @@
       </div>
       <div id="dashBranchBreakdown"></div>
       <div class="stat-grid">
-        <div class="stat-card"><div class="lbl">ยอดขายรวม</div><div class="val" id="dashTotal" style="color:var(--pink);">฿0</div></div>
-        <div class="stat-card"><div class="lbl">จำนวนบิล</div><div class="val" id="dashOrders">0</div></div>
-        <div class="stat-card"><div class="lbl">เฉลี่ย/บิล</div><div class="val" id="dashAvg">฿0</div></div>
-        <div class="stat-card"><div class="lbl">สินค้าขายดี</div><div class="val" id="dashTopQty">-</div></div>
+        <div class="stat-card"><span class="stat-ic">💰</span><div class="lbl">ยอดขายรวม</div><div class="val" id="dashTotal" style="color:var(--pink);">฿0</div></div>
+        <div class="stat-card"><span class="stat-ic">🧾</span><div class="lbl">จำนวนบิล</div><div class="val" id="dashOrders">0</div></div>
+        <div class="stat-card"><span class="stat-ic">📊</span><div class="lbl">เฉลี่ย/บิล</div><div class="val" id="dashAvg">฿0</div></div>
+        <div class="stat-card"><span class="stat-ic">🏆</span><div class="lbl">สินค้าขายดี</div><div class="val" id="dashTopQty" style="font-size:15px;">-</div></div>
       </div>
 
       <div class="chart-card">
@@ -1831,17 +1834,21 @@ function loadDashboard(){
     document.getElementById('dashTopQty').textContent = top.length? top[0][0] : '-';
     const maxQty = top.length? top[0][1] : 1;
     const minQty = worst.length? worst[worst.length-1][1] : 1;
-    const rankRow = (rank,name,barPct,barClass,rightHtml,subHtml)=>`
-      <div class="rank-row">
-        <div class="rank-badge">${rank}</div>
+    const MEDALS = ['🥇','🥈','🥉'];
+    const rankRow = (rank,name,barPct,barClass,rightHtml,subHtml,champion)=>{
+      const medal = MEDALS[rank-1];
+      const badge = medal ? `<div class="rank-badge medal">${medal}</div>` : `<div class="rank-badge">${rank}</div>`;
+      return `
+      <div class="rank-row${champion?' champion':''}">
+        ${badge}
         <div class="rr-body">
-          <div class="rr-head"><div class="rr-name">${escapeHtml(name)}</div><div class="rr-nums">${rightHtml}</div></div>
+          <div class="rr-head"><div class="rr-name">${champion?'👑 ':''}${escapeHtml(name)}</div><div class="rr-nums">${rightHtml}</div></div>
           ${subHtml||''}
           <div class="bar-wrap"><div class="bar-fill ${barClass||''}" style="width:${Math.max(barPct,3)}%;"></div></div>
         </div>
-      </div>`;
+      </div>`;};
     document.getElementById('dashTopList').innerHTML = top.map(([name,qty],idx)=>
-      rankRow(idx+1, name, qty/maxQty*100, '', `<b>${baht(revTally[name]||0)}</b> <span>· ${qty} ชิ้น</span>`)
+      rankRow(idx+1, name, qty/maxQty*100, '', `<b>${baht(revTally[name]||0)}</b> <span>· ${qty} ชิ้น</span>`, null, idx===0)
     ).join('') || '<div class="empty-cart">ยังไม่มีข้อมูลการขาย</div>';
     document.getElementById('dashWorstList').innerHTML = worst.map(([name,qty],idx)=>
       rankRow(idx+1, name, qty/(maxQty||1)*100, 'worst', `<b>${baht(revTally[name]||0)}</b> <span>· ${qty} ชิ้น</span>`)
